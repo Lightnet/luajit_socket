@@ -17,9 +17,9 @@ include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 # Add LuaJIT using CPM
 CPMAddPackage(
     NAME luajit
-    GITHUB_REPOSITORY LuaJIT/LuaJIT
-    GIT_TAG v2.1.0-beta3  # Use a specific tag for consistency (matches your v2.1 intent)
-    DOWNLOAD_ONLY YES     # Only download, we'll build manually
+    GITHUB_REPOSITORY LuaJIT/LuaJIT 
+    GIT_TAG v2.1
+    DOWNLOAD_ONLY YES
 )
 
 # Define LuaJIT DLL and import library paths
@@ -53,7 +53,7 @@ endif()
 # Add LuaSocket using CPM
 CPMAddPackage(
     NAME luasocket
-    GITHUB_REPOSITORY lunarmodules/luasocket
+    GITHUB_REPOSITORY lunarmodules/luasocket 
     GIT_TAG v3.1.0
 )
 
@@ -85,24 +85,40 @@ foreach(src_file ${LUASOCKET_SRC})
     endif()
 endforeach()
 
-# Build LuaSocket as a shared library (DLL)
-add_library(luasocket SHARED ${LUASOCKET_SRC})
-set_target_properties(luasocket PROPERTIES 
-    OUTPUT_NAME "socket"  # Matches LuaSocket convention (socket.dll)
-)
-target_include_directories(luasocket PUBLIC 
-    "${luajit_SOURCE_DIR}/src"
-    "${luasocket_SOURCE_DIR}/src"
-)
-target_link_libraries(luasocket PRIVATE 
-    ${LUAJIT_LIB}
-    ws2_32
-)
-if(MSVC)
-    target_compile_definitions(luasocket PRIVATE 
-        _CRT_SECURE_NO_WARNINGS 
-        _WINSOCK_DEPRECATED_NO_WARNINGS
-        "luaopen_socket_core=luaopen_socket"  # Rename entry point for require('socket')
+# Define LuaSocket DLL and LIB paths
+set(LUASOCKET_DLL "${CMAKE_BINARY_DIR}/socket.dll")
+set(LUASOCKET_LIB "${CMAKE_BINARY_DIR}/socket.lib")
+
+# Build LuaSocket as a shared library (DLL) only if missing
+if(NOT EXISTS ${LUASOCKET_DLL} OR NOT EXISTS ${LUASOCKET_LIB})
+    message(STATUS "Building LuaSocket DLL...")
+    add_library(luasocket SHARED ${LUASOCKET_SRC})
+    set_target_properties(luasocket PROPERTIES 
+        OUTPUT_NAME "socket"  # Outputs socket.dll and socket.lib
+    )
+    target_include_directories(luasocket PUBLIC 
+        "${luajit_SOURCE_DIR}/src"
+        "${luasocket_SOURCE_DIR}/src"
+    )
+    target_link_libraries(luasocket PRIVATE 
+        ${LUAJIT_LIB}
+        ws2_32
+    )
+    if(MSVC)
+        target_compile_definitions(luasocket PRIVATE 
+            _CRT_SECURE_NO_WARNINGS 
+            _WINSOCK_DEPRECATED_NO_WARNINGS
+            "luaopen_socket_core=luaopen_socket"  # Rename entry point for require('socket')
+        )
+    endif()
+else()
+    message(STATUS "LuaSocket DLL and LIB already exist, skipping build.")
+    # Add an imported library target for linking without rebuilding
+    add_library(luasocket SHARED IMPORTED)
+    set_target_properties(luasocket PROPERTIES 
+        IMPORTED_LOCATION "${LUASOCKET_DLL}"
+        IMPORTED_IMPLIB "${LUASOCKET_LIB}"
+        INTERFACE_INCLUDE_DIRECTORIES "${luajit_SOURCE_DIR}/src;${luasocket_SOURCE_DIR}/src"
     )
 endif()
 
@@ -121,12 +137,14 @@ set(OUTPUT_DIR $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LUAJIT_DLL} ${OUTPUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:luasocket> ${OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LUASOCKET_DLL} ${OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/main.lua" ${OUTPUT_DIR}
     COMMENT "Copying LuaJIT DLL, LuaSocket DLL, and main.lua to output directory"
 )
 
 # Debug output to verify paths
-message(STATUS "LuaJIT source: ${luajit_SOURCE_DIR}")
-message(STATUS "LuaSocket source: ${luasocket_SOURCE_DIR}")
-message(STATUS "LuaSocket sources: ${LUASOCKET_SRC}")
+# message(STATUS "LuaJIT source: ${luajit_SOURCE_DIR}")
+# message(STATUS "LuaSocket source: ${luasocket_SOURCE_DIR}")
+# message(STATUS "LuaSocket sources: ${LUASOCKET_SRC}")
+# message(STATUS "LuaSocket DLL: ${LUASOCKET_DLL}")
+# message(STATUS "LuaSocket LIB: ${LUASOCKET_LIB}")

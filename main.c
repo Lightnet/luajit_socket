@@ -5,6 +5,7 @@
 #include <lualib.h>
 
 int main() {
+    printf("init lua app\n");
     lua_State *L = luaL_newstate();
     if (!L) {
         fprintf(stderr, "Failed to create Lua state\n");
