@@ -14,16 +14,13 @@ if(NOT EXISTS "${CMAKE_BINARY_DIR}/cmake/CPM.cmake")
 endif()
 include(${CMAKE_BINARY_DIR}/cmake/CPM.cmake)
 
-# Enable FetchContent
-include(FetchContent)
-
-# Fetch LuaJIT
-FetchContent_Declare(
-    luajit
-    GIT_REPOSITORY https://github.com/LuaJIT/LuaJIT.git
-    GIT_TAG v2.1
+# Add LuaJIT using CPM
+CPMAddPackage(
+    NAME luajit
+    GITHUB_REPOSITORY LuaJIT/LuaJIT
+    GIT_TAG v2.1.0-beta3  # Use a specific tag for consistency (matches your v2.1 intent)
+    DOWNLOAD_ONLY YES     # Only download, we'll build manually
 )
-FetchContent_MakeAvailable(luajit)
 
 # Define LuaJIT DLL and import library paths
 set(LUAJIT_DLL "${luajit_SOURCE_DIR}/src/lua51.dll")
@@ -119,18 +116,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${LUAJIT_LIB}
 )
 
-# Copy both LuaJIT and LuaSocket DLLs to output directory
+# Copy LuaJIT DLL, LuaSocket DLL, and main.lua to output directory
 set(OUTPUT_DIR $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LUAJIT_DLL} ${OUTPUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:luasocket> ${OUTPUT_DIR}
-    COMMENT "Copying LuaJIT and LuaSocket DLLs to output directory"
-)
-
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/main.lua" ${OUTPUT_DIR}
-    COMMENT "Copying main.lua to output directory"
+    COMMENT "Copying LuaJIT DLL, LuaSocket DLL, and main.lua to output directory"
 )
 
 # Debug output to verify paths
